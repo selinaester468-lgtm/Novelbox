@@ -8,14 +8,30 @@ import { DeleteConfirmModal } from './components/DeleteConfirmModal';
 import { BackupModal } from './components/BackupModal';
 import { StatsModal } from './components/StatsModal';
 import { ReaderModal } from './components/ReaderModal';
-import { Novel, ReadingStatus, ViewMode, SortField, SortOrder } from './types/novel';
+import { SupabaseModal } from './components/SupabaseModal';
+import { Novel, ReadingStatus, SortField, SortOrder } from './types/novel';
 import { loadNovels, saveNovels, resetNovels } from './utils/storage';
 import { GENRE_LIST } from './data/defaultNovels';
-import { Plus, User, BookOpen, Check } from 'lucide-react';
+import { 
+  supabase, 
+  checkSupabaseConnection, 
+  fetchNovels, 
+  insertNovel, 
+  updateNovel, 
+  deleteNovel, 
+  mapRowToNovel, 
+  SupabaseStatus 
+} from './services/supabase';
+import { Plus, User, BookOpen, Check, Database, RefreshCw } from 'lucide-react';
 
 export default function App() {
   const [novels, setNovels] = useState<Novel[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+
+  // Supabase Database Status
+  const [supabaseStatus, setSupabaseStatus] = useState<SupabaseStatus>('checking');
+  const [supabaseMessage, setSupabaseMessage] = useState<string>('Menghubungkan ke Supabase...');
+  const [isSupabaseOpen, setIsSupabaseOpen] = useState(false);
 
   // Filters and Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -43,16 +59,84 @@ export default function App() {
     }, 2500);
   };
 
-  // Initialize from storage
+  // Initialize from Supabase (with automatic fallback to local cache)
+  const loadLibrary = async () => {
+    setSupabaseStatus('checking');
+    try {
+      const conn = await checkSupabaseConnection();
+      setSupabaseStatus(conn.status);
+      setSupabaseMessage(conn.message);
+
+      if (conn.status === 'connected') {
+        const result = await fetchNovels();
+        if (result.source === 'supabase') {
+          setNovels(result.novels);
+          saveNovels(result.novels);
+        } else {
+          const fallback = loadNovels();
+          setNovels(fallback);
+        }
+      } else {
+        const fallback = loadNovels();
+        setNovels(fallback);
+      }
+    } catch (err: any) {
+      console.error('Error during library init:', err);
+      setSupabaseStatus('error');
+      setSupabaseMessage('Gagal terhubung ke database cloud Supabase.');
+      const fallback = loadNovels();
+      setNovels(fallback);
+    } finally {
+      setIsLoaded(true);
+    }
+  };
+
   useEffect(() => {
-    const loaded = loadNovels();
-    setNovels(loaded);
-    setIsLoaded(true);
+    loadLibrary();
   }, []);
 
-  // Sync to storage
+  // Supabase Real-time updates subscription
   useEffect(() => {
-    if (isLoaded) {
+    const channel = supabase
+      .channel('novels-realtime-sync')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'novels' },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const newNovel = mapRowToNovel(payload.new);
+            setNovels((prev) => {
+              if (prev.some((n) => n.id === newNovel.id)) return prev;
+              return [newNovel, ...prev];
+            });
+            showToast(`Novel baru disinkronkan: "${payload.new.title || ''}"`);
+          } else if (payload.eventType === 'UPDATE') {
+            const updated = mapRowToNovel(payload.new);
+            setNovels((prev) =>
+              prev.map((n) => (n.id === updated.id ? updated : n))
+            );
+            if (selectedNovel && selectedNovel.id === updated.id) {
+              setSelectedNovel(updated);
+            }
+            if (readingNovel && readingNovel.id === updated.id) {
+              setReadingNovel(updated);
+            }
+          } else if (payload.eventType === 'DELETE') {
+            const deletedId = String(payload.old.id);
+            setNovels((prev) => prev.filter((n) => n.id !== deletedId));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [selectedNovel, readingNovel]);
+
+  // Keep local storage synchronized as offline cache
+  useEffect(() => {
+    if (isLoaded && novels.length > 0) {
       saveNovels(novels);
     }
   }, [novels, isLoaded]);
@@ -103,42 +187,62 @@ export default function App() {
     setIsAddEditOpen(true);
   };
 
-  const handleSaveNovel = (
+  const handleSaveNovel = async (
     novelData: Omit<Novel, 'id' | 'dateAdded'>,
     editId?: string
   ) => {
     if (editId) {
+      const existing = novels.find((n) => n.id === editId);
+      const updated: Novel = {
+        ...(existing || { id: editId, dateAdded: new Date().toISOString().split('T')[0] }),
+        ...novelData,
+      };
+
       setNovels((prev) =>
-        prev.map((item) => {
-          if (item.id === editId) {
-            const updated = {
-              ...item,
-              ...novelData,
-            };
-            if (selectedNovel && selectedNovel.id === editId) {
-              setSelectedNovel(updated);
-            }
-            if (readingNovel && readingNovel.id === editId) {
-              setReadingNovel(updated);
-            }
-            return updated;
-          }
-          return item;
-        })
+        prev.map((item) => (item.id === editId ? updated : item))
       );
-      showToast(`Novel "${novelData.title}" diperbarui.`);
+      if (selectedNovel && selectedNovel.id === editId) {
+        setSelectedNovel(updated);
+      }
+      if (readingNovel && readingNovel.id === editId) {
+        setReadingNovel(updated);
+      }
+
+      // Persist to Supabase if connected
+      if (supabaseStatus === 'connected') {
+        const res = await updateNovel(updated);
+        if (res.success) {
+          showToast(`Novel "${novelData.title}" diperbarui di Supabase.`);
+        } else {
+          showToast(`Novel diperbarui lokal (Supabase: ${res.error || 'belum siap'}).`);
+        }
+      } else {
+        showToast(`Novel "${novelData.title}" diperbarui.`);
+      }
     } else {
       const newNovel: Novel = {
         ...novelData,
         id: `novel-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
         dateAdded: new Date().toISOString().split('T')[0],
       };
+
       setNovels((prev) => [newNovel, ...prev]);
-      showToast(`Novel "${newNovel.title}" ditambahkan.`);
+
+      // Persist to Supabase if connected
+      if (supabaseStatus === 'connected') {
+        const res = await insertNovel(newNovel);
+        if (res.success) {
+          showToast(`Novel "${newNovel.title}" tersimpan di Supabase.`);
+        } else {
+          showToast(`Novel disimpan lokal (Supabase: ${res.error || 'belum siap'}).`);
+        }
+      } else {
+        showToast(`Novel "${newNovel.title}" ditambahkan.`);
+      }
     }
   };
 
-  const handleDeleteConfirm = (novel: Novel) => {
+  const handleDeleteConfirm = async (novel: Novel) => {
     setNovels((prev) => prev.filter((n) => n.id !== novel.id));
     if (selectedNovel && selectedNovel.id === novel.id) {
       setSelectedNovel(null);
@@ -147,54 +251,65 @@ export default function App() {
       setReadingNovel(null);
     }
     setNovelToDelete(null);
-    showToast(`Novel "${novel.title}" telah dihapus.`);
+
+    // Delete in Supabase if connected
+    if (supabaseStatus === 'connected') {
+      const res = await deleteNovel(novel.id);
+      if (res.success) {
+        showToast(`Novel "${novel.title}" dihapus dari Supabase.`);
+      } else {
+        showToast(`Novel dihapus lokal.`);
+      }
+    } else {
+      showToast(`Novel "${novel.title}" telah dihapus.`);
+    }
   };
 
-  const handleUpdateStatus = (novel: Novel, newStatus: ReadingStatus) => {
+  const handleUpdateStatus = async (novel: Novel, newStatus: ReadingStatus) => {
+    const updated: Novel = {
+      ...novel,
+      status: newStatus,
+      dateCompleted:
+        newStatus === 'Selesai'
+          ? novel.dateCompleted || new Date().toISOString().split('T')[0]
+          : novel.dateCompleted,
+    };
+
     setNovels((prev) =>
-      prev.map((n) => {
-        if (n.id === novel.id) {
-          const updated: Novel = {
-            ...n,
-            status: newStatus,
-            dateCompleted:
-              newStatus === 'Selesai'
-                ? n.dateCompleted || new Date().toISOString().split('T')[0]
-                : n.dateCompleted,
-          };
-          if (selectedNovel && selectedNovel.id === novel.id) {
-            setSelectedNovel(updated);
-          }
-          if (readingNovel && readingNovel.id === novel.id) {
-            setReadingNovel(updated);
-          }
-          return updated;
-        }
-        return n;
-      })
+      prev.map((n) => (n.id === novel.id ? updated : n))
     );
+    if (selectedNovel && selectedNovel.id === novel.id) {
+      setSelectedNovel(updated);
+    }
+    if (readingNovel && readingNovel.id === novel.id) {
+      setReadingNovel(updated);
+    }
+
+    if (supabaseStatus === 'connected') {
+      await updateNovel(updated);
+    }
     showToast(`Status: ${newStatus}`);
   };
 
-  const handleUpdateProgress = (novel: Novel, newChapter: number) => {
+  const handleUpdateProgress = async (novel: Novel, newChapter: number) => {
+    const updated: Novel = {
+      ...novel,
+      currentChapter: newChapter,
+    };
+
     setNovels((prev) =>
-      prev.map((n) => {
-        if (n.id === novel.id) {
-          const updated: Novel = {
-            ...n,
-            currentChapter: newChapter,
-          };
-          if (selectedNovel && selectedNovel.id === novel.id) {
-            setSelectedNovel(updated);
-          }
-          if (readingNovel && readingNovel.id === novel.id) {
-            setReadingNovel(updated);
-          }
-          return updated;
-        }
-        return n;
-      })
+      prev.map((n) => (n.id === novel.id ? updated : n))
     );
+    if (selectedNovel && selectedNovel.id === novel.id) {
+      setSelectedNovel(updated);
+    }
+    if (readingNovel && readingNovel.id === novel.id) {
+      setReadingNovel(updated);
+    }
+
+    if (supabaseStatus === 'connected') {
+      await updateNovel(updated);
+    }
   };
 
   const handleImportNovels = (imported: Novel[]) => {
@@ -216,18 +331,57 @@ export default function App() {
       <div className="w-full max-w-md min-h-screen sm:min-h-[920px] bg-[#F7F2EB] sm:rounded-[40px] shadow-2xl border border-[#E9DFD3] relative flex flex-col overflow-hidden">
         {/* Main Content Area */}
         <div className="px-5 pt-8 pb-28 flex-1 overflow-y-auto">
-          {/* Top Header Bar: NovelBox + User Avatar (Exact Reference Match) */}
-          <div className="flex items-center justify-between mb-6">
-            <h1 className="font-serif text-[40px] font-bold text-[#4B2F1D] tracking-tight leading-none">
-              NovelBox
-            </h1>
-            <button
-              onClick={() => setIsStatsOpen(true)}
-              title="Profil & Statistik Koleksi"
-              className="w-12 h-12 rounded-full bg-[#CEB8A2] hover:bg-[#C0A892] text-[#553723] flex items-center justify-center transition-transform active:scale-95 cursor-pointer shadow-2xs"
-            >
-              <User className="w-6 h-6 stroke-[1.9]" />
-            </button>
+          {/* Top Header Bar: NovelBox + Supabase status pill + Actions */}
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h1 className="font-serif text-[38px] font-bold text-[#4B2F1D] tracking-tight leading-none">
+                NovelBox
+              </h1>
+              {/* Supabase Connection Status Pill */}
+              <div className="mt-1 flex items-center gap-1.5">
+                <button
+                  onClick={() => setIsSupabaseOpen(true)}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-medium transition-all cursor-pointer shadow-2xs active:scale-95 ${
+                    supabaseStatus === 'connected'
+                      ? 'bg-[#E3EED5] text-[#335C1D] border border-[#C6DCB3] hover:bg-[#D7E7C5]'
+                      : supabaseStatus === 'table_missing'
+                      ? 'bg-[#FFF2DE] text-[#8C5D19] border border-[#F2DEBF] hover:bg-[#FFE7C4]'
+                      : supabaseStatus === 'checking'
+                      ? 'bg-[#F2ECE3] text-[#715F52] border border-[#E4DBD0]'
+                      : 'bg-[#FDE8E8] text-[#9A2D2D] border border-[#F5CACA]'
+                  }`}
+                  title="Klik untuk konfigurasi dan status database Supabase"
+                >
+                  <Database className="w-3 h-3 shrink-0" />
+                  <span>
+                    {supabaseStatus === 'connected'
+                      ? 'Supabase Cloud (Sinkron)'
+                      : supabaseStatus === 'table_missing'
+                      ? 'Setup Supabase SQL'
+                      : supabaseStatus === 'checking'
+                      ? 'Menghubungkan...'
+                      : 'Supabase Offline'}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsSupabaseOpen(true)}
+                title="Status Database Cloud Supabase"
+                className="w-11 h-11 rounded-full bg-[#EFE6DB] hover:bg-[#E5D9CC] text-[#634935] flex items-center justify-center transition-transform active:scale-95 cursor-pointer shadow-2xs border border-[#E2D5C6]"
+              >
+                <Database className="w-5 h-5 stroke-[1.9]" />
+              </button>
+              <button
+                onClick={() => setIsStatsOpen(true)}
+                title="Profil & Statistik Koleksi"
+                className="w-12 h-12 rounded-full bg-[#CEB8A2] hover:bg-[#C0A892] text-[#553723] flex items-center justify-center transition-transform active:scale-95 cursor-pointer shadow-2xs"
+              >
+                <User className="w-6 h-6 stroke-[1.9]" />
+              </button>
+            </div>
           </div>
 
           {/* Search Bar Input (Exact Reference Match) */}
@@ -310,6 +464,17 @@ export default function App() {
         </div>
       )}
 
+      {/* Supabase Connection Modal */}
+      <SupabaseModal
+        isOpen={isSupabaseOpen}
+        onClose={() => setIsSupabaseOpen(false)}
+        status={supabaseStatus}
+        statusMessage={supabaseMessage}
+        novels={novels}
+        onRefreshConnection={loadLibrary}
+        onSeedSuccess={(count) => showToast(`${count} novel berhasil diunggah ke Supabase!`)}
+      />
+
       {/* Modals & In-App Reader */}
       <NovelDetailModal
         novel={selectedNovel}
@@ -354,6 +519,7 @@ export default function App() {
         isOpen={isStatsOpen}
         onClose={() => setIsStatsOpen(false)}
         novels={novels}
+        onOpenSupabase={() => setIsSupabaseOpen(true)}
       />
     </div>
   );

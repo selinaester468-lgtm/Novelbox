@@ -7,9 +7,15 @@ interface StatsModalProps {
   isOpen: boolean;
   onClose: () => void;
   novels: Novel[];
+  onOpenSupabase?: () => void;
 }
 
-export const StatsModal: React.FC<StatsModalProps> = ({ isOpen, onClose, novels }) => {
+export const StatsModal: React.FC<StatsModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  novels,
+  onOpenSupabase 
+}) => {
   if (!isOpen) return null;
 
   const stats = calculateStats(novels);
@@ -134,10 +140,21 @@ export const StatsModal: React.FC<StatsModalProps> = ({ isOpen, onClose, novels 
           </div>
         </div>
 
-        <div className="pt-2 text-right">
+        <div className="pt-2 flex items-center justify-between gap-2 border-t border-[#EBE3D7]">
+          {onOpenSupabase && (
+            <button
+              onClick={() => {
+                onClose();
+                onOpenSupabase();
+              }}
+              className="px-3.5 py-2 text-xs font-semibold text-[#5B4332] bg-[#EFE8DD] hover:bg-[#E5DBCF] rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
+            >
+              <span>Database Cloud Supabase</span>
+            </button>
+          )}
           <button
             onClick={onClose}
-            className="px-5 py-2 text-xs font-semibold text-[#FAF8F5] bg-[#755946] hover:bg-[#634A39] rounded-xl transition-colors cursor-pointer"
+            className="px-5 py-2 text-xs font-semibold text-[#FAF8F5] bg-[#755946] hover:bg-[#634A39] rounded-xl transition-colors cursor-pointer ml-auto"
           >
             Tutup
           </button>
