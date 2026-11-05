@@ -1,0 +1,6 @@
+{
+  "name": "NovelBox",
+  "description": "Aplikasi pengelola koleksi novel digital elegan bernuansa perpustakaan modern dengan fitur pencarian, filter genre, dan status bacaan.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
