@@ -22,7 +22,7 @@ import {
   mapRowToNovel, 
   SupabaseStatus 
 } from './services/supabase';
-import { Plus, User, BookOpen, Check, Database, RefreshCw } from 'lucide-react';
+import { Plus, User, BookOpen, Check, Database, RefreshCw, FileUp } from 'lucide-react';
 
 export default function App() {
   const [novels, setNovels] = useState<Novel[]>([]);
@@ -32,6 +32,9 @@ export default function App() {
   const [supabaseStatus, setSupabaseStatus] = useState<SupabaseStatus>('checking');
   const [supabaseMessage, setSupabaseMessage] = useState<string>('Menghubungkan ke Supabase...');
   const [isSupabaseOpen, setIsSupabaseOpen] = useState(false);
+
+  // Form Mode for New Novel
+  const [formInitialMode, setFormInitialMode] = useState<'upload' | 'manual'>('upload');
 
   // Filters and Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -231,13 +234,15 @@ export default function App() {
       // Persist to Supabase if connected
       if (supabaseStatus === 'connected') {
         const res = await insertNovel(newNovel);
+        const docInfo = newNovel.fileName ? ' beserta seluruh isi dokumen' : '';
         if (res.success) {
-          showToast(`Novel "${newNovel.title}" tersimpan di Supabase.`);
+          showToast(`Novel "${newNovel.title}"${docInfo} berhasil disimpan di Supabase!`);
         } else {
           showToast(`Novel disimpan lokal (Supabase: ${res.error || 'belum siap'}).`);
         }
       } else {
-        showToast(`Novel "${newNovel.title}" ditambahkan.`);
+        const docInfo = newNovel.fileName ? ' beserta dokumen' : '';
+        showToast(`Novel "${newNovel.title}"${docInfo} ditambahkan.`);
       }
     }
   };
@@ -443,14 +448,29 @@ export default function App() {
           )}
         </div>
 
-        {/* Floating Action Button (FAB) '+' in Bottom Right (Exact Reference Match) */}
-        <button
-          onClick={handleOpenAdd}
-          title="Tambah Novel Baru"
-          className="absolute bottom-6 right-6 z-30 w-13 h-13 rounded-2xl bg-[#BA997D] hover:bg-[#A88569] active:scale-95 text-white flex items-center justify-center shadow-lg transition-all cursor-pointer"
-        >
-          <Plus className="w-7 h-7 stroke-[2.4]" />
-        </button>
+        {/* Floating Action Buttons in Bottom Right */}
+        <div className="absolute bottom-6 right-6 z-30 flex items-center gap-2">
+          <button
+            onClick={() => {
+              setNovelToEdit(null);
+              setFormInitialMode('upload');
+              setIsAddEditOpen(true);
+            }}
+            title="Unggah Berkas Novel (.pdf, .docx, .txt, .epub)"
+            className="h-13 px-4 rounded-2xl bg-white/95 hover:bg-white active:scale-95 text-[#523A28] flex items-center gap-2 shadow-lg border border-[#E2D4C3] transition-all cursor-pointer text-xs font-semibold backdrop-blur-xs"
+          >
+            <FileUp className="w-4 h-4 text-[#BA997D]" />
+            <span>Unggah File</span>
+          </button>
+
+          <button
+            onClick={handleOpenAdd}
+            title="Tambah Novel Baru"
+            className="w-13 h-13 rounded-2xl bg-[#BA997D] hover:bg-[#A88569] active:scale-95 text-white flex items-center justify-center shadow-lg transition-all cursor-pointer shrink-0"
+          >
+            <Plus className="w-7 h-7 stroke-[2.4]" />
+          </button>
+        </div>
 
         {/* Subtle Bottom Bar with Data Tools */}
         <div className="absolute bottom-0 inset-x-0 h-4 bg-gradient-to-t from-[#F7F2EB] to-transparent pointer-events-none" />
@@ -499,6 +519,7 @@ export default function App() {
         onClose={() => setIsAddEditOpen(false)}
         onSave={handleSaveNovel}
         novelToEdit={novelToEdit}
+        initialMode={formInitialMode}
       />
 
       <DeleteConfirmModal

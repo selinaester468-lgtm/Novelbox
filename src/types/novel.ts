@@ -34,6 +34,9 @@ export interface Novel {
   dateAdded: string; // ISO date string
   dateCompleted?: string;
   chapters?: Chapter[];
+  fileName?: string;
+  fileSize?: string;
+  fileType?: string;
 }
 
 export type ViewMode = 'grid' | 'shelf' | 'list';

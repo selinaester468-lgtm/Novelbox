@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Star, Edit3, Trash2, CheckCircle2, Clock, BookMarked, Quote, Plus, Minus, BookOpen, Calendar } from 'lucide-react';
+import { X, Star, Edit3, Trash2, CheckCircle2, Clock, BookMarked, Quote, Plus, Minus, BookOpen, Calendar, FileText, Layers } from 'lucide-react';
 import { Novel, ReadingStatus } from '../types/novel';
 
 interface NovelDetailModalProps {
@@ -225,6 +225,78 @@ export const NovelDetailModal: React.FC<NovelDetailModalProps> = ({
                   className="bg-[#785C47] h-full rounded-full transition-all duration-300"
                   style={{ width: `${progressPercent}%` }}
                 />
+              </div>
+            </div>
+          )}
+
+          {/* Uploaded Document Info Card (if novel was imported from file) */}
+          {novel.fileName && (
+            <div className="bg-[#F2F7EC] border border-[#C5DDB8] rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-[#DFEED3] text-[#33631A] flex items-center justify-center shrink-0">
+                  <FileText className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="font-bold text-[#2A4B1A] text-xs sm:text-sm">{novel.fileName}</p>
+                  <p className="text-[11px] text-[#4F6E3B]">
+                    {novel.fileSize ? `Ukuran: ${novel.fileSize} • ` : ''}Isi teks & bab tersimpan di Supabase
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  onClose();
+                  onRead(novel);
+                }}
+                className="px-3.5 py-1.5 rounded-xl bg-[#4A6F32] hover:bg-[#3D5C28] text-white font-medium text-xs cursor-pointer shadow-2xs transition-colors self-start sm:self-center"
+              >
+                Baca Dokumen
+              </button>
+            </div>
+          )}
+
+          {/* Chapters List */}
+          {novel.chapters && novel.chapters.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[#7A695A] flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>Daftar Bab ({novel.chapters.length} Bab)</span>
+                </h4>
+                <button
+                  onClick={() => {
+                    onClose();
+                    onRead(novel);
+                  }}
+                  className="text-xs text-[#7A5B45] hover:text-[#523A2A] font-medium underline underline-offset-2 cursor-pointer"
+                >
+                  Buka Pembaca
+                </button>
+              </div>
+              <div className="max-h-48 overflow-y-auto space-y-1.5 bg-white/80 p-2.5 rounded-2xl border border-[#EAE1D6]">
+                {novel.chapters.map((ch, idx) => (
+                  <div
+                    key={ch.id || idx}
+                    onClick={() => {
+                      onUpdateProgress(novel, ch.number);
+                      onClose();
+                      onRead(novel);
+                    }}
+                    className="p-2.5 rounded-xl hover:bg-[#F5EFE7] transition-colors cursor-pointer flex items-center justify-between group border border-transparent hover:border-[#E4D7C8]"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                      <span className="w-6 h-6 rounded-lg bg-[#EFE8DD] text-[#634E3E] text-xs font-semibold flex items-center justify-center shrink-0">
+                        {ch.number}
+                      </span>
+                      <span className="text-xs font-medium text-[#382B21] group-hover:text-[#634E3E] truncate">
+                        {ch.title}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-[#8C7A6D] group-hover:text-[#634E3E] font-medium shrink-0">
+                      Baca Bab →
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           )}

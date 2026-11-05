@@ -86,6 +86,9 @@ export const mapRowToNovel = (row: any): Novel => {
     publishedYear: row.published_year ?? row.publishedYear ?? undefined,
     dateAdded: row.date_added ?? row.dateAdded ?? new Date().toISOString().split('T')[0],
     dateCompleted: row.date_completed ?? row.dateCompleted ?? undefined,
+    fileName: row.file_name ?? row.fileName ?? (row.notes?.startsWith('Berkas:') ? row.notes.replace(/^Berkas:\s*/, '').split(' (')[0] : undefined),
+    fileSize: row.file_size ?? row.fileSize ?? undefined,
+    fileType: row.file_type ?? row.fileType ?? undefined,
     chapters: Array.isArray(row.chapters) ? row.chapters : []
   };
 };
@@ -101,12 +104,12 @@ export const mapNovelToRow = (novel: Novel) => {
     description: novel.description || '',
     cover_url: novel.coverUrl || '',
     rating: novel.rating ?? 5.0,
-    total_chapters: novel.totalChapters ?? 1,
+    total_chapters: novel.totalChapters ?? (novel.chapters && novel.chapters.length > 0 ? novel.chapters.length : 1),
     current_chapter: novel.currentChapter ?? 1,
     total_pages: novel.totalPages ?? 100,
     current_page: novel.currentPage ?? 1,
     favorite_quote: novel.favoriteQuote || '',
-    notes: novel.notes || '',
+    notes: novel.notes || (novel.fileName ? `Berkas: ${novel.fileName}${novel.fileSize ? ` (${novel.fileSize})` : ''}` : ''),
     published_year: novel.publishedYear || null,
     date_added: novel.dateAdded || new Date().toISOString().split('T')[0],
     date_completed: novel.dateCompleted || null,
