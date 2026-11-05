@@ -1,23 +1,27 @@
 import { Novel } from '../types/novel';
 import { INITIAL_NOVELS } from '../data/defaultNovels';
 
-const STORAGE_KEY = 'novelbox_library_v5';
+const STORAGE_KEY = 'novelbox_library_v6';
 
 export const loadNovels = (): Novel[] => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) {
-      // Check if v1 existed, otherwise load full new trending library
+      // Load full library including Laut Bercerita
       saveNovels(INITIAL_NOVELS);
       return INITIAL_NOVELS;
     }
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed) && parsed.length > 0) {
-      // Merge with INITIAL_NOVELS if chapters are missing
-      const hasChapters = parsed.some((n: Novel) => n.chapters && n.chapters.length > 0);
-      if (!hasChapters) {
-        saveNovels(INITIAL_NOVELS);
-        return INITIAL_NOVELS;
+      // Ensure Laut Bercerita is present
+      const hasLaut = parsed.some((n: Novel) => n.id === 'novel-laut-bercerita');
+      if (!hasLaut) {
+        const lautNovel = INITIAL_NOVELS.find((n: Novel) => n.id === 'novel-laut-bercerita');
+        if (lautNovel) {
+          const updated = [lautNovel, ...parsed];
+          saveNovels(updated);
+          return updated;
+        }
       }
       return parsed;
     }

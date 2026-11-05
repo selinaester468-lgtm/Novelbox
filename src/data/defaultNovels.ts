@@ -2,6 +2,11 @@ import { Novel } from '../types/novel';
 
 export const PRESET_COVERS = [
   {
+    name: 'Laut Bercerita (Official)',
+    url: '/src/assets/images/shared_page_1.jpg',
+    theme: 'Undersea Watercolor Original'
+  },
+  {
     name: 'Dilan & Romansa',
     url: '/src/assets/images/cover_senja_hujan_1793874774349.jpg',
     theme: 'Warm Rain & Street'
@@ -421,6 +426,46 @@ Satu-satunya petunjuk yang ia tinggalkan adalah sebuah lukisan potret diri yang 
   },
 
   // ================= 4. DRAMA / KEHIDUPAN =================
+  {
+    id: 'novel-laut-bercerita',
+    title: 'Laut Bercerita',
+    author: 'Leila S. Chudori',
+    genre: 'Drama / Kehidupan',
+    status: 'Sedang Dibaca',
+    description: 'Di sebuah senja, mahasiswa bernama Biru Laut disergap empat lelaki tak dikenal. Bersama kawan-kawannya dia disekap dan disiksa. Dari dasar laut yang sunyi, Biru Laut bercerita tentang persahabatan, cinta, dan keluarga yang tak pernah berhenti menantinya pulang.',
+    coverUrl: '/src/assets/images/shared_page_1.jpg',
+    rating: 4.9,
+    totalChapters: 24,
+    currentChapter: 4,
+    totalPages: 379,
+    currentPage: 82,
+    favoriteQuote: '"Kematian bukan hal yang paling menakutkan, melainkan dilupakan dan kebenaran yang dikubur."',
+    notes: 'Karya sastra luar biasa mengharukan karya Leila S. Chudori (dari tautan resmi yang dibagikan).',
+    publishedYear: 2017,
+    dateAdded: '2026-03-05',
+    chapters: [
+      {
+        id: 'laut-1',
+        number: 1,
+        title: 'Bab 1: Suara dari Dasar Samudra',
+        content: `Malam itu dingin sekali. Kegelapan di dasar laut bukan kegelapan yang biasa kamu kenal di kamar tidurmu ketika lampu dipadamkan. Ini adalah kegelapan yang menekan dada, pekat, seolah ribuan ton air menimpa pundak dan memelukmu tanpa belas kasihan.
+
+Namaku Biru Laut. Sebelum tubuhku diikat dengan rantai besi dan dilemparkan ke kedalaman palung, aku adalah seorang mahasiswa sastra yang gemar membaca novel Victor Hugo dan memasak tengkleng kambing bersama kawan-kawan di rumah kontrakan Seyegan.
+
+Kami tidak berbuat jahat. Kami hanya berkumpul di bawah temaram lampu teplok, mendiskusikan buku-buku terlarang, membagikan selebaran tentang petani yang tanahnya dirampas, dan bermimpi tentang sebuah negeri di mana kata-kata tidak perlu dibungkam dengan moncong senapan.`
+      },
+      {
+        id: 'laut-2',
+        number: 2,
+        title: 'Bab 2: Dapur Ibu dan Hari Minggu di Pejaten',
+        content: `Setiap Minggu sore di rumah kami di Pejaten, aroma tumisan bumbu dapur Ibu selalu menjadi mercusuar yang memanggil kami pulang. Ibu selalu bersikeras bahwa meja makan adalah tempat suci di mana seluruh keluarga harus duduk bersama.
+
+Ayah akan meletakkan satu piring untuk dirinya, satu piring untuk sang ibu, satu piring untukku, dan satu piring untuk adikku, Asmara Jati.
+
+Ibu memasak tengkleng dan gulai kesukaanku. Mereka duduk menanti dan menanti di meja makan itu setiap Minggu sore, tak pernah menyadari bahwa anak sulung mereka telah menjadi abadi di pelukan terumbu karang.`
+      }
+    ]
+  },
   {
     id: 'novel-laskar-pelangi',
     title: 'Laskar Pelangi',
